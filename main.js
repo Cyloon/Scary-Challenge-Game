@@ -25,6 +25,9 @@ const sizes = {
 //const gui = new GUI();
 
 // consts
+
+let i = 0;
+let score = 0;
 let enemyHit;
 let pineTreeHit;
 let isDead;
@@ -43,10 +46,6 @@ let deathTween;
 let walkAction;
 let attackAction;
 let deathAction;
-
-//THREE.ColorManagement.legacyMode = false;
-
-let i = 0;
 
 // canvas
 const canvas = document.querySelector("canvas.webgl");
@@ -453,12 +452,12 @@ function enemyDeathAndReset(enemyClone, index) {
   }
 
   deathTween = new TWEEN.Tween(enemiesCurrentPosition[index])
-    .to({ y: -1 }, 3000) // 3 seconds to sink under ground
+    .to({ y: -3 }, 3000) // 3 seconds to sink under ground
     .easing(TWEEN.Easing.Linear.None)
     .onComplete(() => {
       enemyClone.position.copy(enemyPosArray[index]);
       enemyClone.position.y = 0;
-      isDead = false;
+      enemyDeadFlags[index] = false;
       animateEnemy(
         enemyClone,
         enemyPosArray[index].x,
@@ -469,7 +468,10 @@ function enemyDeathAndReset(enemyClone, index) {
     });
   deathTweens[index] = deathTween;
   deathTween.start();
-  console.log(TWEEN.getAll());
+  score++;
+  document.getElementById(
+    "score"
+  ).innerHTML = `<h1>Zombies killed: ${score}</h1>`;
 }
 
 /**
@@ -504,6 +506,11 @@ function animate() {
 }
 
 animate();
+
+//set domelement
+document.getElementById(
+  "score"
+).innerHTML = `<h1>Zombies killed: ${score}</h1>`;
 
 /* function enemyDeathAndReset(enemyClone, index) {
   const mixer = mixers[index];
