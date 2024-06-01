@@ -301,7 +301,7 @@ window.addEventListener("mousemove", function (e) {
   }
 
   // Clear the message before checking for intersections
-  document.getElementById("zombiehit").innerHTML = "";
+  //document.getElementById("zombiehit").innerHTML = "";
 
   // is the light shining on any enemy? (is the raycaster point hitting any part of any enemy?)
   enemyHit = false;
@@ -318,8 +318,8 @@ window.addEventListener("mousemove", function (e) {
 
       if (!pineTreeHit && !enemyDeadFlags[index]) {
         enemyDeathAndReset(enemyClone, index);
-        document.getElementById("zombiehit").innerHTML =
-          "<h1>The Zombie is Hit</h1>";
+        //document.getElementById("zombiehit").innerHTML =
+        //  "<h1>The Zombie is Hit</h1>";
       }
     }
   });
@@ -469,6 +469,7 @@ function enemyDeathAndReset(enemyClone, index) {
   deathTweens[index] = deathTween;
   deathTween.start();
   score++;
+  //set domelement
   document.getElementById(
     "score"
   ).innerHTML = `<h1>Zombies killed: ${score}</h1>`;
@@ -507,149 +508,6 @@ function animate() {
 
 animate();
 
-//set domelement
 document.getElementById(
   "score"
 ).innerHTML = `<h1>Zombies killed: ${score}</h1>`;
-
-/* function enemyDeathAndReset(enemyClone, index) {
-  const mixer = mixers[index];
-  const isDead = enemyDeadFlags[index];
-
-  if (isDead) {
-    return;
-  }
-
-  const deathClip = THREE.AnimationClip.findByName(
-    clips,
-    "EnemyArmature|EnemyArmature|EnemyArmature|Death"
-  );
-  const deathAction = mixer.clipAction(deathClip);
-  deathAction.setEffectiveTimeScale(0.3);
-
-  const walkClip = THREE.AnimationClip.findByName(
-    clips,
-    "EnemyArmature|EnemyArmature|EnemyArmature|Walk"
-  );
-  const walkAction = mixer.clipAction(walkClip);
-  walkAction.setEffectiveTimeScale(0.9);
-
-  const attackClip = THREE.AnimationClip.findByName(
-    clips,
-    "EnemyArmature|EnemyArmature|EnemyArmature|Attack"
-  );
-  const attackAction = mixer.clipAction(attackClip);
-  attackAction.setEffectiveTimeScale(0.02);
-
-  attackAction.stop();
-  walkAction.stop();
-
-  deathAction.reset().play();
-  enemyDeadFlags[index] = true;
-
-  deathAction.clampWhenFinished = true;
-  deathAction.loop = THREE.LoopOnce;
-
-  deathAction.onComplete(() => {
-    enemyClone.visible = false;
-
-    enemyClone.position.copy(enemyPosArray[index]);
-    enemyDeadFlags[index] = false;
-
-    setTimeout(() => {
-      enemyClone.visible = true;
-      const endX = enemyClone.position.x > 0 ? -1 : 1;
-      new TWEEN.Tween(enemyClone.position)
-        .to({ x: endX }, 10000)
-        .repeat(Infinity)
-        .yoyo(true)
-        .start();
-
-      walkAction.reset().play();
-    }, 5000);
-  });
-} */
-
-//Zombie animations Attack, Death, HitRecive, Idle, Jump, Run, Walk
-
-// IMPORTANT ABOUT SPOTLIGHT! Set Decay to 0
-// SpotLight( color, intensity, distance, angle, penumbra, decay)
-
-//renderer.outputEncoding = THREE.sRGBEncoding;
-//renderer.toneMapping = THREE.ACESFilmicToneMapping;
-
-/* const deathClip = THREE.AnimationClip.findByName(
-  clips,
-  "EnemyArmature|EnemyArmature|EnemyArmature|Death"
-);
-const deathAction = mixer.clipAction(deathClip);
-deathAction.setEffectiveTimeScale(0.3);
-if (deathHit) {
-  walkAction.reset();
-  attackAction.reset();
-  deathAction.play();
-  //animateEnemy();
-} */
-
-// Ensure the animation loop is set to `animate`
-//renderer.setAnimationLoop(animate);
-
-/* // for getting glow on clock
-const analogclocktarget = new THREE.WebGLRenderTarget(
-  sizes.width,
-  sizes.height,
-  {
-    type: THREE.HalfFloatType,
-    format: THREE.RGBAFormat,
-    encoding: THREE.sRGBEncoding,
-  }
-);
-analogclocktarget.samples = 8;
-const composer = new EffectComposer(renderer, analogclocktarget);
-composer.addPass(new RenderPass(scene, camera));
-composer.addPass(new UnrealBloomPass(undefined, 1, 1, 1)); */
-
-/*   if (zombie) {
-    console.log("Zombie position before:", zombie.position.x);
-    if (zombie.position.x >= 5) {
-      deltaX = -deltaX; // Reverse direction when target is reached
-    } else if (zombie.position.x <= 2) {
-      deltaX = -deltaX; // Reverse direction when reaching initial position
-    }
-    zombie.position.x += deltaX; // Update zombie position
-    console.log("Zombie position after:", zombie.position.x);
-  } */
-
-/* 
-  enemypositionsArray = []
-  
-  let pineTreesPosArray = [
-  new THREE.Vector3(2.5, 1.8, 2),
-  new THREE.Vector3(-2.5, 1.8, 2),
-  new THREE.Vector3(-3, 1.8, 4),
-  new THREE.Vector3(3, 1.8, 4),
-  new THREE.Vector3(-3, 1.8, 8),
-  new THREE.Vector3(3, 1.8, 8),
-  ];
-
-  for each enemyposition place zombie
-      if x value is negative
-        rotate model
-          play animations
-
-  if zombie is hit by light
-      play death animation
-        remove that zombie
-          put zombie in start position
-            play animation again
-
-            
-    TWEEN animation starts and random times on each zombie
-
-
-
-
-
-    
-
-  */
