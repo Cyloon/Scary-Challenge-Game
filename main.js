@@ -3,6 +3,12 @@ import "./style.css";
 import * as THREE from "three";
 import * as TWEEN from "@tweenjs/tween.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+import {
+  loadChurch,
+  loadAnalogClock,
+  loadPineTree,
+  loadZombie,
+} from "./loaders";
 
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
@@ -13,6 +19,13 @@ import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js";
 //Pine tree by Poly by Google [CC-BY] (https://creativecommons.org/licenses/by/3.0/) via Poly Pizza (https://poly.pizza/m/7rTNpk6j01O)
 //Analog clock by Poly by Google [CC-BY] (https://creativecommons.org/licenses/by/3.0/) via Poly Pizza (https://poly.pizza/m/5gAoMR2YHs3)
 
+/* Music by <a href="https://pixabay.com/users/purpleplanetmusic-23350895/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=172408">Geoffrey Harvey</a> from <a href="https://pixabay.com/music//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=172408">Pixabay</a>
+ */
+
+/* Music by <a href="https://pixabay.com/users/geoffharvey-9096471/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=180852">Geoff Harvey</a> from <a href="https://pixabay.com/music//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=180852">Pixabay</a> */
+
+/* Sound Effect from <a href="https://pixabay.com/sound-effects/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=29924">Pixabay</a>
+ */
 /**
  * Sizes
  */
@@ -25,8 +38,10 @@ const sizes = {
 //const gui = new GUI();
 
 // consts
-
-let i = 0;
+let sound;
+let delta;
+let step;
+//let i = 0;
 let score = 0;
 let enemyHit;
 let pineTreeHit;
@@ -39,6 +54,14 @@ let deathActions = [];
 let startTweens = [];
 let backTweens = [];
 let deathTweens = [];
+const pineTreesArray = [];
+
+let enemy;
+let head;
+let clips;
+const mixers = [];
+const enemiesCurrentPosition = [];
+const enemyDeadFlags = [];
 
 let startTween;
 let backTween;
@@ -47,15 +70,153 @@ let walkAction;
 let attackAction;
 let deathAction;
 
+let audioInitialized = false;
+
+// to calculate rotation
+const rotationMatrix = new THREE.Matrix4();
+let targetQuaternion = new THREE.Quaternion();
+//let targetQuaternion = camera.quaternion;
+
+const rotatespeed = 2;
+
 // canvas
 const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
 
+/* .
+.
+.
+.
+.
+.
+.
+.
+ */
+
+// Loader
+
+async function init() {
+  const scene = setupScene();
+
+  try {
+    // Load all models and wait for them all to be loaded
+    const [church, analogclock, pineTree, zombie] = await Promise.all([
+      loadChurch(),
+      loadAnalogClock(),
+      loadPineTree(),
+      loadZombie(),
+    ]);
+
+    function traverseAndAddShadow(object) {
+      object.traverse(function (child) {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+    }
+
+    //  Churchmodel settings
+    church.scale.set(0.1, 0.1, 0.1);
+    church.position.set(0, 0, -15);
+    traverseAndAddShadow(church);
+    scene.add(church);
+
+    // Clockmodel settings
+    analogclock.scale.set(0.05, 0.05, 0.05);
+    analogclock.rotateY(-Math.PI / 2);
+    analogclock.position.set(0, 5, -10.9);
+    traverseAndAddShadow(analogclock);
+    scene.add(analogclock);
+
+    // Pinetreemodel settings
+    pineTree.scale.set(2, 2, 2); // set scale/size of model
+
+    //for every cooardinates(items) in the array render a copy of the loaded model
+    //and place it according to the cooardinates in that position in the array
+    for (let i = 0; i < pineTreesPosArray.length; i++) {
+      let pineTreeClone = SkeletonUtils.clone(pineTree);
+      pineTreeClone.position.copy(pineTreesPosArray[i]);
+      traverseAndAddShadow(pineTreeClone);
+      scene.add(pineTreeClone);
+      pineTreesArray.push(pineTreeClone);
+    }
+
+    enemy = zombie;
+    clips = enemy.animations;
+    enemy.scale.set(0.5, 0.5, 0.5);
+    enemy.traverse(function (child) {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    //for every cooardinates(items) in the array render a copy of the loaded model
+    //and place it according to the cooardinates in that position in the array
+    //also add a mixer and walk and attack animation to each model
+    for (i = 0; i < enemyPosArray.length; i++) {
+      let enemyClone = SkeletonUtils.clone(enemy);
+      enemyClone.position.copy(enemyPosArray[i]);
+
+      if (enemyClone.position.x > 0) {
+        enemyClone.rotation.y = -Math.PI / 2;
+      } else {
+        enemyClone.rotation.y = Math.PI / 2;
+      }
+
+      heads[i] = enemyClone.getObjectByName("Head");
+      scene.add(enemyClone);
+      enemiesCurrentPosition[i] = enemyClone;
+      enemyDeadFlags[i] = false;
+      const zombiemoanLoader = new THREE.AudioLoader();
+      zombiemoanLoader.load(
+        "/zombie-moans-29924-edited.mp3",
+        function (buffer) {
+          sound = new THREE.PositionalAudio(listener);
+          sound.setBuffer(buffer);
+          sound.setRefDistance(10);
+          sound.setLoop(false);
+          enemyClone.add(sound);
+        }
+      );
+
+      //const delayTime = Math.random() * 10000;
+      const startX = enemyClone.position.x;
+      endX = enemyClone.position.x > 0 ? 1 : -1;
+      animateEnemy(enemyClone, startX, endX, randomDelayTime(), i, sound);
+    }
+
+    animate();
+  } catch (error) {
+    console.error("error loading models", error);
+  }
+}
+
+/* 
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+
+
+
+
+ */
+
 // Objects
 const geometry = new THREE.SphereGeometry(1, 16, 16);
-//const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 const material = new THREE.MeshBasicMaterial({
   map: new THREE.TextureLoader().load("/moon.jpg"),
 });
@@ -86,6 +247,41 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.set(0, 2, 14);
 scene.add(camera);
+
+// Audio
+
+// create an AudioListener and add it to the camera
+const listener = new THREE.AudioListener();
+camera.add(listener);
+
+// create a global audio source
+const music = new THREE.Audio(listener);
+const zombiemoanLoader = new THREE.Audio(listener);
+//const zombiemoan = [];
+
+// load a sound and set it as the Audio object's buffer
+const musicLoader = new THREE.AudioLoader();
+musicLoader.load("/spirits-of-the-moor-180852.mp3", function (buffer) {
+  music.setBuffer(buffer);
+  music.setLoop(true);
+  music.setVolume(0.5);
+  //music.play();
+});
+
+// load a sound and set it as the Audio object's buffer
+//const zombiemoanLoader = new THREE.AudioLoader();
+
+/*  zombiemoanLoader.load("/zombie-moans-29924-edited.mp3", function (buffer) {
+  zombiemoan[i] = new THREE.PositionalAudio (listener);
+  zombiemoan[i].setBuffer ( buffer);
+  enemyClone.add(zombiemoan[i])}
+
+
+   zombiemoan.setBuffer(buffer);
+   zombiemoan.setLoop(false);
+   zombiemoan.setVolume(0.5);
+   zombiemoan.play();
+ }); */
 
 // Plane
 const groundGeometry = new THREE.PlaneGeometry(25, 25, 32, 32);
@@ -119,34 +315,7 @@ let enemyPosArray = [
   new THREE.Vector3(-4, 0, 7),
 ];
 
-// Loader
-
-// Load church model
-
-const churchLoader = new GLTFLoader();
-let church;
-
-churchLoader.load(
-  "/Church.glb",
-  function (gltf) {
-    church = gltf.scene;
-    church.scale.set(0.1, 0.1, 0.1);
-    church.position.set(0, 0, -15);
-    church.traverse(function (child) {
-      if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
-    scene.add(church);
-  },
-  undefined,
-  function (error) {
-    console.error(error);
-  }
-);
-
-// load clock model
+/* // load clock model
 
 const analogclockLoader = new GLTFLoader();
 let ananlogclock;
@@ -164,12 +333,12 @@ analogclockLoader.load(
   function (error) {
     console.error(error);
   }
-);
+); */
 
-// Load pinetree model
+/* // Load pinetree model
 const pineLoader = new GLTFLoader();
 
-const pineTreesArray = [];
+
 
 pineLoader.load(
   "/Pinetree.glb",
@@ -194,19 +363,12 @@ pineLoader.load(
   function (error) {
     console.error(error);
   }
-);
+); */
 
 // load zombie model
 const zombieLoader = new GLTFLoader();
 
-let enemy;
-let head;
-let clips;
-const mixers = [];
-const enemiesCurrentPosition = [];
-const enemyDeadFlags = [];
-
-zombieLoader.load(
+/* zombieLoader.load(
   "/Zombie.glb",
   function (gltf) {
     clips = gltf.animations;
@@ -236,20 +398,34 @@ zombieLoader.load(
       scene.add(enemyClone);
       enemiesCurrentPosition[i] = enemyClone;
       enemyDeadFlags[i] = false;
+      const zombiemoanLoader = new THREE.AudioLoader();
+      zombiemoanLoader.load(
+        "/zombie-moans-29924-edited.mp3",
+        function (buffer) {
+          sound = new THREE.PositionalAudio(listener);
+          sound.setBuffer(buffer);
+          sound.setRefDistance(10);
+          sound.setLoop(false);
+          enemyClone.add(sound);
+        }
+      );
 
       //const delayTime = Math.random() * 10000;
       const startX = enemyClone.position.x;
       endX = enemyClone.position.x > 0 ? 1 : -1;
-      animateEnemy(enemyClone, startX, endX, randomDelayTime(), i);
+      animateEnemy(enemyClone, startX, endX, randomDelayTime(), i, sound);
     }
   },
   undefined,
   function (error) {
     console.error(error);
   }
-);
+); */
 
 // Lights
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
 
 //clock light
 const clocklight = new THREE.PointLight(0xc0c0c0, 0.8, 100);
@@ -291,6 +467,11 @@ const raycaster = new THREE.Raycaster();
 // Eventlisteners
 
 window.addEventListener("mousemove", function (e) {
+  if (!audioInitialized) {
+    const audioContext = listener.context;
+    audioContext.resume();
+    audioInitialized = true;
+  }
   mousePosition.x = (e.clientX / sizes.width) * 2 - 1;
   mousePosition.y = -(e.clientY / sizes.height) * 2 + 1;
   planeNormal.copy(camera.position).normalize();
@@ -357,7 +538,8 @@ function randomDelayTime() {
   return Math.random() * 10000;
 }
 
-function animateEnemy(enemyClone, startX, endX, delayTime, index) {
+function animateEnemy(enemyClone, startX, endX, delayTime, index, sound) {
+  let targetQuaternion = camera.quaternion;
   endX = enemyClone.position.x > 0 ? 1 : -1;
   head = heads[index];
   startTween = new TWEEN.Tween(enemyClone.position)
@@ -367,6 +549,9 @@ function animateEnemy(enemyClone, startX, endX, delayTime, index) {
       enemyDeadFlags[index] = false;
       console.log("Starting startTween for enemy index:", index);
       // set mixer and animation clips
+      if (sound) {
+        sound.play();
+      }
       const mixer = new THREE.AnimationMixer(enemyClone);
 
       const deathClip = THREE.AnimationClip.findByName(
@@ -401,19 +586,28 @@ function animateEnemy(enemyClone, startX, endX, delayTime, index) {
     })
     .easing(TWEEN.Easing.Quadratic.Out)
     .onComplete(() => {
-      endX > 0
+      /* endX > 0
         ? enemyClone.rotateY(Math.PI / 2)
-        : enemyClone.rotateY(-Math.PI / 2);
+        : enemyClone.rotateY(-Math.PI / 2); */
+      //target2.position.setFromObject(target2);
+      console.log(target2.quaternion);
+      console.log(target2);
+      console.log(target2.position);
+      head.lookAt(
+        target2.position,
+        enemiesCurrentPosition[index],
+        enemyClone.up
+      );
     });
 
   backTween = new TWEEN.Tween(enemyClone.position)
     .to({ x: 0, z: 15 }, 7000) // 7 seconds to move towards the player
     .onStart(() => {
-      head.lookAt(target2.position);
+      //target2.position?
     })
     .easing(TWEEN.Easing.Circular.In)
     .onComplete(() => {
-      endX > 0 ? enemyClone.rotateY(Math.PI) : enemyClone.rotateY(-Math.PI);
+      //endX > 0 ? enemyClone.rotateY(Math.PI) : enemyClone.rotateY(-Math.PI);
     });
 
   startTweens[index] = startTween;
@@ -424,6 +618,15 @@ function animateEnemy(enemyClone, startX, endX, delayTime, index) {
 
   startTween.start();
 }
+
+/* function rotateEnemyTowardsCamera(enemyClone, targetQuaternion, index) {
+  enemyClone = enemyClone[index];
+  let step = rotatespeed * delta;
+  if (!enemyClone.quaternion.equals(targetQuaternion)) {
+    console.log("it isn't facing the camera");
+    enemyClone.quaternion.rotateTowards(targetQuaternion, step);
+  }
+} */
 
 function enemyDeathAndReset(enemyClone, index) {
   if (enemyDeadFlags[index]) {
@@ -445,11 +648,6 @@ function enemyDeathAndReset(enemyClone, index) {
 
   TWEEN.remove(startTween);
   TWEEN.remove(backTween);
-  if (startTween) {
-    console.log("not removed");
-  } else {
-    ("yes suceccfully removed");
-  }
 
   deathTween = new TWEEN.Tween(enemiesCurrentPosition[index])
     .to({ y: -3 }, 3000) // 3 seconds to sink under ground
@@ -465,9 +663,14 @@ function enemyDeathAndReset(enemyClone, index) {
         randomDelayTime(),
         index
       );
+      if (sound) {
+        sound.stop();
+        console.log("sound stopped");
+      }
     });
   deathTweens[index] = deathTween;
   deathTween.start();
+
   score++;
   //set domelement
   document.getElementById(
@@ -484,10 +687,12 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
 
-  const delta = clock.getDelta();
+  delta = clock.getDelta();
   mixers.forEach((mixer) => {
     mixer.update(delta);
   });
+
+  //step = rotatespeed * delta;
 
   // update tween
   TWEEN.update();
@@ -511,3 +716,34 @@ animate();
 document.getElementById(
   "score"
 ).innerHTML = `<h1>Zombies killed: ${score}</h1>`;
+
+/* 
+console.log(target2.quaternion);
+let step = rotatespeed * delta;
+rotationMatrix.lookAt(
+  target2.position,
+  enemyClone.position,
+  enemyClone.up
+);
+targetQuaternion.setFromRotationMatrix(rotationMatrix);
+if (!enemyClone.quaternion.equals(targetQuaternion)) {
+  console.log("it isn't facing the camera");
+  enemyClone.quaternion.rotateTowards(targetQuaternion, step); 
+}
+
+//rotateEnemyTowardsCamera(enemyClone, targetQuaternion, index);
+console.log("rotating towards camera");
+
+/* //to rotate a bit more slowly
+const rotationMatrix = new THREE.Matrix4();
+const targetQuaternion = new THREE.Quaternion();
+const rotatespeed = 2; */
+
+// in animate()
+// if mesh(object) rotation
+/* if (!mesh.quaternion.equals(targetQuaternion)) {
+  const step = rotatespeed * delta;
+  mesh.quaternion.rotateTowards(targetQuaternion, step);
+} */
+
+// compute target rotation
