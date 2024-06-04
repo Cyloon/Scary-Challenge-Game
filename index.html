@@ -3,16 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/zombie-svgrepo-com.svg" />
+    <link rel="stylesheet" href="style.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The Scary Challenge game</title>
   </head>
   <body>
     <div class="container">
       <div class="content">
-        <div class="mousepos" id="mousepos"></div>
-        <div class="zombiehit" id="zombiehit"></div>
         <div class="score" id="score"></div>
       </div>
+    </div>
+    <div id="backstory" class="backstory">
+      <p>
+        Your so called "friends" have dared you to a challenge. Go to the old
+        abandoned church in the woods outside of town.
+      </p>
+      <p>Your only weapon is your trusty old flashlight!</p>
+      <p>
+        There is monsters hiding behind the trees! The only way to scare them
+        away is to shine your light on them when they appear
+      </p>
+    </div>
+    <button id="startButton" class="startButton">Start Game</button>
+    <div id="gameOverMessage" class="gameOverMessage">
+      Game over! Reload page
     </div>
     <canvas class="webgl"></canvas>
     <script type="module" src="/main.js"></script>

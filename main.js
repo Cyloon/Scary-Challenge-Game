@@ -3,12 +3,8 @@ import "./style.css";
 import * as THREE from "three";
 import * as TWEEN from "@tweenjs/tween.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-import {
-  loadChurch,
-  loadAnalogClock,
-  loadPineTree,
-  loadZombie,
-} from "./loaders";
+import { AudioContext } from "three";
+//import { rotateTowardsTarget } from "./rotatetowardstarget";
 
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
@@ -29,40 +25,21 @@ import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js";
 /**
  * Sizes
  */
-const sizes = {
-  width: window.innerWidth,
-  height: window.innerHeight,
-};
 
 // Debug
 //const gui = new GUI();
 
 // consts
-let sound;
 let delta;
-let step;
-//let i = 0;
 let score = 0;
-let enemyHit;
 let pineTreeHit;
-let isDead;
-let endX;
-let heads = [];
 let walkActions = [];
 let attackActions = [];
 let deathActions = [];
 let startTweens = [];
 let backTweens = [];
 let deathTweens = [];
-const pineTreesArray = [];
-
-let enemy;
-let head;
-let clips;
 const mixers = [];
-const enemiesCurrentPosition = [];
-const enemyDeadFlags = [];
-
 let startTween;
 let backTween;
 let deathTween;
@@ -70,174 +47,23 @@ let walkAction;
 let attackAction;
 let deathAction;
 
-let audioInitialized = false;
-
-// to calculate rotation
-const rotationMatrix = new THREE.Matrix4();
-let targetQuaternion = new THREE.Quaternion();
-//let targetQuaternion = camera.quaternion;
-
-const rotatespeed = 2;
+let listener;
+let music;
+let deathSound;
 
 // canvas
 const canvas = document.querySelector("canvas.webgl");
 
-// Scene
+// set up scene
+const sizes = {
+  width: window.innerWidth,
+  height: window.innerHeight,
+};
+
 const scene = new THREE.Scene();
 
-/* .
-.
-.
-.
-.
-.
-.
-.
- */
+//scene, lighting, camera
 
-// Loader
-
-async function init() {
-  const scene = setupScene();
-
-  try {
-    // Load all models and wait for them all to be loaded
-    const [church, analogclock, pineTree, zombie] = await Promise.all([
-      loadChurch(),
-      loadAnalogClock(),
-      loadPineTree(),
-      loadZombie(),
-    ]);
-
-    function traverseAndAddShadow(object) {
-      object.traverse(function (child) {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
-      });
-    }
-
-    //  Churchmodel settings
-    church.scale.set(0.1, 0.1, 0.1);
-    church.position.set(0, 0, -15);
-    traverseAndAddShadow(church);
-    scene.add(church);
-
-    // Clockmodel settings
-    analogclock.scale.set(0.05, 0.05, 0.05);
-    analogclock.rotateY(-Math.PI / 2);
-    analogclock.position.set(0, 5, -10.9);
-    traverseAndAddShadow(analogclock);
-    scene.add(analogclock);
-
-    // Pinetreemodel settings
-    pineTree.scale.set(2, 2, 2); // set scale/size of model
-
-    //for every cooardinates(items) in the array render a copy of the loaded model
-    //and place it according to the cooardinates in that position in the array
-    for (let i = 0; i < pineTreesPosArray.length; i++) {
-      let pineTreeClone = SkeletonUtils.clone(pineTree);
-      pineTreeClone.position.copy(pineTreesPosArray[i]);
-      traverseAndAddShadow(pineTreeClone);
-      scene.add(pineTreeClone);
-      pineTreesArray.push(pineTreeClone);
-    }
-
-    enemy = zombie;
-    clips = enemy.animations;
-    enemy.scale.set(0.5, 0.5, 0.5);
-    enemy.traverse(function (child) {
-      if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
-
-    //for every cooardinates(items) in the array render a copy of the loaded model
-    //and place it according to the cooardinates in that position in the array
-    //also add a mixer and walk and attack animation to each model
-    for (i = 0; i < enemyPosArray.length; i++) {
-      let enemyClone = SkeletonUtils.clone(enemy);
-      enemyClone.position.copy(enemyPosArray[i]);
-
-      if (enemyClone.position.x > 0) {
-        enemyClone.rotation.y = -Math.PI / 2;
-      } else {
-        enemyClone.rotation.y = Math.PI / 2;
-      }
-
-      heads[i] = enemyClone.getObjectByName("Head");
-      scene.add(enemyClone);
-      enemiesCurrentPosition[i] = enemyClone;
-      enemyDeadFlags[i] = false;
-      const zombiemoanLoader = new THREE.AudioLoader();
-      zombiemoanLoader.load(
-        "/zombie-moans-29924-edited.mp3",
-        function (buffer) {
-          sound = new THREE.PositionalAudio(listener);
-          sound.setBuffer(buffer);
-          sound.setRefDistance(10);
-          sound.setLoop(false);
-          enemyClone.add(sound);
-        }
-      );
-
-      //const delayTime = Math.random() * 10000;
-      const startX = enemyClone.position.x;
-      endX = enemyClone.position.x > 0 ? 1 : -1;
-      animateEnemy(enemyClone, startX, endX, randomDelayTime(), i, sound);
-    }
-
-    animate();
-  } catch (error) {
-    console.error("error loading models", error);
-  }
-}
-
-/* 
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-.
-
-
-
-
- */
-
-// Objects
-const geometry = new THREE.SphereGeometry(1, 16, 16);
-const material = new THREE.MeshBasicMaterial({
-  map: new THREE.TextureLoader().load("/moon.jpg"),
-});
-
-const sphere = new THREE.Mesh(geometry, material);
-sphere.position.set(10, 7, -10);
-scene.add(sphere); // the mooon
-
-//mouse and light target
-const target = new THREE.Object3D();
-target.position.z = -2;
-scene.add(target);
-
-//target object behind camera
-const target2 = new THREE.Object3D();
-target2.position.set(0, 4, 15);
-scene.add(target2);
-
-/**
- * Camera
- */
 // Base camera
 const camera = new THREE.PerspectiveCamera(
   45,
@@ -248,41 +74,10 @@ const camera = new THREE.PerspectiveCamera(
 camera.position.set(0, 2, 14);
 scene.add(camera);
 
-// Audio
+// Controls
+const controls = new OrbitControls(camera, canvas);
 
-// create an AudioListener and add it to the camera
-const listener = new THREE.AudioListener();
-camera.add(listener);
-
-// create a global audio source
-const music = new THREE.Audio(listener);
-const zombiemoanLoader = new THREE.Audio(listener);
-//const zombiemoan = [];
-
-// load a sound and set it as the Audio object's buffer
-const musicLoader = new THREE.AudioLoader();
-musicLoader.load("/spirits-of-the-moor-180852.mp3", function (buffer) {
-  music.setBuffer(buffer);
-  music.setLoop(true);
-  music.setVolume(0.5);
-  //music.play();
-});
-
-// load a sound and set it as the Audio object's buffer
-//const zombiemoanLoader = new THREE.AudioLoader();
-
-/*  zombiemoanLoader.load("/zombie-moans-29924-edited.mp3", function (buffer) {
-  zombiemoan[i] = new THREE.PositionalAudio (listener);
-  zombiemoan[i].setBuffer ( buffer);
-  enemyClone.add(zombiemoan[i])}
-
-
-   zombiemoan.setBuffer(buffer);
-   zombiemoan.setLoop(false);
-   zombiemoan.setVolume(0.5);
-   zombiemoan.play();
- }); */
-
+//GroundPlane
 // Plane
 const groundGeometry = new THREE.PlaneGeometry(25, 25, 32, 32);
 groundGeometry.rotateX(-Math.PI / 2);
@@ -295,137 +90,32 @@ const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
 groundMesh.receiveShadow = true;
 scene.add(groundMesh);
 
-// Pinetrees locations array
-let pineTreesPosArray = [
-  new THREE.Vector3(2.5, 1.5, 2),
-  new THREE.Vector3(-2.5, 1.5, 2),
-  new THREE.Vector3(-3, 1.5, 4),
-  new THREE.Vector3(3, 1.5, 4),
-  new THREE.Vector3(-3, 1.5, 8),
-  new THREE.Vector3(3, 1.5, 8),
-];
+// Objects
 
-// Enemy starting position array
-let enemyPosArray = [
-  new THREE.Vector3(4, 0, 1),
-  new THREE.Vector3(-4, 0, 1),
-  new THREE.Vector3(4, 0, 3),
-  new THREE.Vector3(-4, 0, 3),
-  new THREE.Vector3(4, 0, 7),
-  new THREE.Vector3(-4, 0, 7),
-];
+// the mooon
+const geometry = new THREE.SphereGeometry(1, 16, 16);
+const material = new THREE.MeshBasicMaterial({
+  map: new THREE.TextureLoader().load("/moon.jpg"),
+});
 
-/* // load clock model
+const sphere = new THREE.Mesh(geometry, material);
+sphere.position.set(10, 7, -10);
+scene.add(sphere);
 
-const analogclockLoader = new GLTFLoader();
-let ananlogclock;
+//mouse and light target
+const target = new THREE.Object3D();
+target.position.z = -2;
+scene.add(target);
 
-analogclockLoader.load(
-  "/Analogclock.glb",
-  function (gltf) {
-    ananlogclock = gltf.scene;
-    ananlogclock.scale.set(0.05, 0.05, 0.05);
-    ananlogclock.rotateY(-Math.PI / 2);
-    ananlogclock.position.set(0, 5, -10.9);
-    scene.add(ananlogclock);
-  },
-  undefined,
-  function (error) {
-    console.error(error);
-  }
-); */
-
-/* // Load pinetree model
-const pineLoader = new GLTFLoader();
-
-
-
-pineLoader.load(
-  "/Pinetree.glb",
-  function (gltf) {
-    gltf.scene.scale.set(2, 2, 2); // set scale/size of model
-    gltf.scene.traverse(function (child) {
-      if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
-    //for every cooardinates(items) in the array render a copy of the loaded model
-    //and place it according to the cooardinates in that position in the array
-    for (i = 0; i < pineTreesPosArray.length; i++) {
-      let pineTree = gltf.scene.clone();
-      pineTree.position.copy(pineTreesPosArray[i]);
-      scene.add(pineTree);
-      pineTreesArray.push(pineTree);
-    }
-  },
-  undefined,
-  function (error) {
-    console.error(error);
-  }
-); */
-
-// load zombie model
-const zombieLoader = new GLTFLoader();
-
-/* zombieLoader.load(
-  "/Zombie.glb",
-  function (gltf) {
-    clips = gltf.animations;
-    enemy = gltf.scene;
-    enemy.scale.set(0.5, 0.5, 0.5);
-    enemy.traverse(function (child) {
-      if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
-
-    //for every cooardinates(items) in the array render a copy of the loaded model
-    //and place it according to the cooardinates in that position in the array
-    //also add a mixer and walk and attack animation to each model
-    for (i = 0; i < enemyPosArray.length; i++) {
-      let enemyClone = SkeletonUtils.clone(enemy);
-      enemyClone.position.copy(enemyPosArray[i]);
-
-      if (enemyClone.position.x > 0) {
-        enemyClone.rotation.y = -Math.PI / 2;
-      } else {
-        enemyClone.rotation.y = Math.PI / 2;
-      }
-
-      heads[i] = enemyClone.getObjectByName("Head");
-      scene.add(enemyClone);
-      enemiesCurrentPosition[i] = enemyClone;
-      enemyDeadFlags[i] = false;
-      const zombiemoanLoader = new THREE.AudioLoader();
-      zombiemoanLoader.load(
-        "/zombie-moans-29924-edited.mp3",
-        function (buffer) {
-          sound = new THREE.PositionalAudio(listener);
-          sound.setBuffer(buffer);
-          sound.setRefDistance(10);
-          sound.setLoop(false);
-          enemyClone.add(sound);
-        }
-      );
-
-      //const delayTime = Math.random() * 10000;
-      const startX = enemyClone.position.x;
-      endX = enemyClone.position.x > 0 ? 1 : -1;
-      animateEnemy(enemyClone, startX, endX, randomDelayTime(), i, sound);
-    }
-  },
-  undefined,
-  function (error) {
-    console.error(error);
-  }
-); */
+//target object behind camera
+const target2 = new THREE.Object3D();
+target2.position.set(0, 4, 15);
+scene.add(target2);
 
 // Lights
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambientLight);
+//const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+//scene.add(ambientLight);
 
 //clock light
 const clocklight = new THREE.PointLight(0xc0c0c0, 0.8, 100);
@@ -447,8 +137,7 @@ scene.add(directionalLight.target);
 
 //const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight, 5);
 //scene.add(directionalLightHelper);
-
-const helper = new THREE.CameraHelper(directionalLight.shadow.camera);
+//const helper = new THREE.CameraHelper(directionalLight.shadow.camera);
 
 //mouse controlled spotlight
 let light = new THREE.SpotLight(0xffffff, 3, 100, 0.1, 0.2, 0);
@@ -457,6 +146,51 @@ light.castShadow = true;
 light.target = target;
 scene.add(light);
 
+const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+renderer.setSize(sizes.width, sizes.height);
+renderer.setClearColor(0x000000);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+// Pinetrees locations array
+let pineTreesPosArray = [
+  new THREE.Vector3(2.5, 1.5, 2),
+  new THREE.Vector3(-2.5, 1.5, 2),
+  new THREE.Vector3(-3, 1.5, 4),
+  new THREE.Vector3(3, 1.5, 4),
+  new THREE.Vector3(-3, 1.5, 8),
+  new THREE.Vector3(3, 1.5, 8),
+];
+
+// Enemy starting position array
+let enemyPosArray = [
+  new THREE.Vector3(4, 0, 1),
+  new THREE.Vector3(-4, 0, 1),
+  new THREE.Vector3(4, 0, 3),
+  new THREE.Vector3(-4, 0, 3),
+  new THREE.Vector3(4, 0, 7),
+  new THREE.Vector3(-4, 0, 7),
+];
+
+let zombieSoundPosAudio = [];
+let deathSoundPosAudio = [];
+let zombieSounds = [];
+let deathSounds = [];
+const pineTreesArray = [];
+const enemiesCurrentPosition = [];
+const enemyDeadFlags = [];
+let heads = [];
+let enemy;
+let pineTree;
+let head;
+let clips;
+let endX;
+let gameRunning = false;
+const clock = new THREE.Clock();
+
 // mouse position consts
 const intersectionPoint = new THREE.Vector3();
 const planeNormal = new THREE.Vector3();
@@ -464,94 +198,174 @@ const plane = new THREE.Plane();
 const mousePosition = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
 
-// Eventlisteners
+const zombieloader = new GLTFLoader();
 
-window.addEventListener("mousemove", function (e) {
-  if (!audioInitialized) {
-    const audioContext = listener.context;
-    audioContext.resume();
-    audioInitialized = true;
+const gltfLoader = new GLTFLoader();
+//let church;
+
+const [churchGlb, zombieGlb, analogclockGlb, pineTreeGlb] = await Promise.all([
+  gltfLoader.loadAsync("/Church.glb"),
+  gltfLoader.loadAsync("/Zombie.glb"),
+  gltfLoader.loadAsync("/Analogclock.glb"),
+  gltfLoader.loadAsync("/Pinetree.glb"),
+]);
+
+function startGame() {
+  gameRunning = true;
+  document.getElementById("startButton").style.display = "none";
+  document.getElementById("backstory").style.display = "none";
+  initializeAudio();
+
+  //Add listner to the camera
+  camera.add(listener);
+
+  //  Churchmodel settings
+  const church = churchGlb.scene;
+  church.scale.set(0.1, 0.1, 0.1);
+  church.position.set(0, 0, -15);
+  traverseAndAddShadow(church);
+
+  scene.add(church);
+
+  // Clockmodel settings
+  const analogclock = analogclockGlb.scene;
+  analogclock.scale.set(0.05, 0.05, 0.05);
+  analogclock.rotateY(-Math.PI / 2);
+  analogclock.position.set(0, 5, -10.9);
+  traverseAndAddShadow(analogclock);
+  scene.add(analogclock);
+
+  // Pinetreemodel settings
+  pineTree = pineTreeGlb.scene;
+  pineTree.scale.set(2, 2, 2); // set scale/size of model
+
+  //for every cooardinates(items) in the array render a clone of the loaded model
+  //and place it according to the cooardinates in that position in the array
+  for (let i = 0; i < pineTreesPosArray.length; i++) {
+    let pineTreeClone = SkeletonUtils.clone(pineTree);
+    pineTreeClone.position.copy(pineTreesPosArray[i]);
+    traverseAndAddShadow(pineTreeClone);
+    scene.add(pineTreeClone);
+    pineTreesArray.push(pineTreeClone);
   }
-  mousePosition.x = (e.clientX / sizes.width) * 2 - 1;
-  mousePosition.y = -(e.clientY / sizes.height) * 2 + 1;
-  planeNormal.copy(camera.position).normalize();
-  plane.setFromNormalAndCoplanarPoint(planeNormal, scene.position);
-  raycaster.setFromCamera(mousePosition, camera);
-  if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
-    target.position.copy(intersectionPoint);
-  }
 
-  // Clear the message before checking for intersections
-  //document.getElementById("zombiehit").innerHTML = "";
+  enemy = zombieGlb.scene;
+  clips = zombieGlb.animations;
+  enemy.scale.set(0.5, 0.5, 0.5);
+  traverseAndAddShadow(enemy);
 
-  // is the light shining on any enemy? (is the raycaster point hitting any part of any enemy?)
-  enemyHit = false;
-  pineTreeHit = false;
-  enemiesCurrentPosition.forEach((enemyClone, index) => {
-    if (raycaster.intersectObject(enemyClone).length > 0) {
-      enemyHit = true;
+  //to be able to attach a zombiemoan to each loaded enemyClone I had to wrap
+  //the whole for loop so that for each clone made the sound is added
+  const zombieSoundLoader = new THREE.AudioLoader();
+  zombieSoundLoader.load("/zombie-moans-29924-edited.mp3", function (buffer) {
+    //for every cooardinates(items) in the array render a clone of the loaded model
+    //and place it according to the cooardinates in that position in the array
+    for (let i = 0; i < enemyPosArray.length; i++) {
+      let enemyClone = SkeletonUtils.clone(enemy);
+      enemyClone.position.copy(enemyPosArray[i]);
+      enemyClone.updateMatrixWorld();
 
-      pineTreesArray.forEach((pineTree) => {
-        if (raycaster.intersectObject(pineTree).length > 0) {
-          pineTreeHit = true;
-        }
-      });
+      const audio = new THREE.Audio(listener);
+      audio.setBuffer(buffer);
+      audio.setLoop(true);
+      audio.setVolume(0.1);
+      enemyClone.add(audio);
 
-      if (!pineTreeHit && !enemyDeadFlags[index]) {
-        enemyDeathAndReset(enemyClone, index);
-        //document.getElementById("zombiehit").innerHTML =
-        //  "<h1>The Zombie is Hit</h1>";
+      // if the enemyClone position is positive rotate it counterclockwise and oposite
+      if (enemyClone.position.x > 0) {
+        enemyClone.rotation.y = -Math.PI / 2;
+      } else {
+        enemyClone.rotation.y = Math.PI / 2;
       }
+
+      heads[i] = enemyClone.getObjectByName("Head");
+      scene.add(enemyClone);
+      enemiesCurrentPosition[i] = enemyClone;
+      // also where to get const audio = enemiesCurrentPosition[i]
+      // audio.play()
+      enemyDeadFlags[i] = false;
+      const startX = enemyClone.position.x;
+      const endX = enemyClone.position.x > 0 ? 1 : -1;
+      animateEnemy(enemyClone, startX, endX, randomDelayTime(), i);
     }
   });
-});
 
-window.addEventListener("resize", () => {
-  // Update sizes
-  sizes.width = window.innerWidth;
-  sizes.height = window.innerHeight;
-
-  // Update camera
-  camera.aspect = sizes.width / sizes.height;
-  camera.updateProjectionMatrix();
-
-  // Update renderer
-  renderer.setSize(sizes.width, sizes.height);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-});
-
-/**
- * Renderer
- */
-const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-renderer.setSize(sizes.width, sizes.height);
-renderer.setClearColor(0x000000);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-// Controls
-const controls = new OrbitControls(camera, canvas);
+  render(scene, camera, renderer, light);
+}
 
 // functions
+
+function init() {
+  document.getElementById("backstory").style.display = "block";
+  document.getElementById("startButton").style.display = "block";
+}
+
+init();
+
+// give every child of the object cast and receive shaddow
+function traverseAndAddShadow(object) {
+  object.traverse(function (child) {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+}
+
+function initializeAudio() {
+  listener = new THREE.AudioListener();
+
+  const music = new THREE.Audio(listener);
+  const musicLoader = new THREE.AudioLoader();
+  musicLoader.load("/spirits-of-the-moor-180852.mp3", function (buffer) {
+    music.setBuffer(buffer);
+    music.setLoop(true);
+    music.setVolume(0.3);
+    music.play();
+    console.log(music);
+  });
+}
+
+function render() {
+  if (!gameRunning) return;
+  requestAnimationFrame(render);
+
+  renderer.render(scene, camera);
+
+  delta = clock.getDelta();
+  mixers.forEach((mixer) => {
+    mixer.update(delta);
+  });
+
+  // update tween
+  TWEEN.update();
+
+  // Update Orbital Controls
+  controls.update();
+
+  // Update spotlight target
+  light.target.updateMatrixWorld(); // Ensure the spotlight target is updated
+  scene.updateMatrixWorld();
+
+  checkGameOver();
+}
 
 function randomDelayTime() {
   return Math.random() * 10000;
 }
 
-function animateEnemy(enemyClone, startX, endX, delayTime, index, sound) {
-  let targetQuaternion = camera.quaternion;
+function animateEnemy(enemyClone, startX, endX, delayTime, index) {
   endX = enemyClone.position.x > 0 ? 1 : -1;
   head = heads[index];
+
   startTween = new TWEEN.Tween(enemyClone.position)
     .to({ x: endX }, 10000) // 10 seconds to move to x:0
     .delay(delayTime)
     .onStart(() => {
       enemyDeadFlags[index] = false;
       console.log("Starting startTween for enemy index:", index);
+
       // set mixer and animation clips
-      if (sound) {
-        sound.play();
-      }
       const mixer = new THREE.AnimationMixer(enemyClone);
 
       const deathClip = THREE.AnimationClip.findByName(
@@ -583,32 +397,25 @@ function animateEnemy(enemyClone, startX, endX, delayTime, index, sound) {
       attackAction.play();
 
       mixers[index] = mixer;
+
+      const anything = enemiesCurrentPosition[index];
+      const audio = anything.children[1];
+      audio.play();
     })
     .easing(TWEEN.Easing.Quadratic.Out)
     .onComplete(() => {
-      /* endX > 0
+      endX > 0
         ? enemyClone.rotateY(Math.PI / 2)
-        : enemyClone.rotateY(-Math.PI / 2); */
-      //target2.position.setFromObject(target2);
-      console.log(target2.quaternion);
-      console.log(target2);
-      console.log(target2.position);
-      head.lookAt(
-        target2.position,
-        enemiesCurrentPosition[index],
-        enemyClone.up
-      );
+        : enemyClone.rotateY(-Math.PI / 2);
+      //rotateTowardsTarget(enemyClone, camera.position, 2000); // Rotate towards camera position over 2 seconds
+      //head.lookAt(target2.position, enemiesCurrentPosition[index], enemyClone.up);
     });
 
   backTween = new TWEEN.Tween(enemyClone.position)
     .to({ x: 0, z: 15 }, 7000) // 7 seconds to move towards the player
-    .onStart(() => {
-      //target2.position?
-    })
+
     .easing(TWEEN.Easing.Circular.In)
-    .onComplete(() => {
-      //endX > 0 ? enemyClone.rotateY(Math.PI) : enemyClone.rotateY(-Math.PI);
-    });
+    .onComplete(() => {});
 
   startTweens[index] = startTween;
   backTweens[index] = backTween;
@@ -619,19 +426,18 @@ function animateEnemy(enemyClone, startX, endX, delayTime, index, sound) {
   startTween.start();
 }
 
-/* function rotateEnemyTowardsCamera(enemyClone, targetQuaternion, index) {
-  enemyClone = enemyClone[index];
-  let step = rotatespeed * delta;
-  if (!enemyClone.quaternion.equals(targetQuaternion)) {
-    console.log("it isn't facing the camera");
-    enemyClone.quaternion.rotateTowards(targetQuaternion, step);
-  }
-} */
-
 function enemyDeathAndReset(enemyClone, index) {
   if (enemyDeadFlags[index]) {
     return;
   }
+  const zombeDeathSoundLoader = new THREE.AudioLoader();
+  zombeDeathSoundLoader.load("/zombiedeath.mp3", function (buffer) {
+    const deathSound = new THREE.Audio(listener);
+    deathSound.setBuffer(buffer);
+    deathSound.setLoop(false);
+    deathSound.setVolume(0.6);
+    deathSound.play();
+  });
 
   deathAction = deathActions[index];
   walkAction = walkActions[index];
@@ -663,10 +469,6 @@ function enemyDeathAndReset(enemyClone, index) {
         randomDelayTime(),
         index
       );
-      if (sound) {
-        sound.stop();
-        console.log("sound stopped");
-      }
     });
   deathTweens[index] = deathTween;
   deathTween.start();
@@ -678,72 +480,72 @@ function enemyDeathAndReset(enemyClone, index) {
   ).innerHTML = `<h1>Zombies killed: ${score}</h1>`;
 }
 
-/**
- * Animate
- */
+function gameOver() {
+  gameRunning = false;
+  document.getElementById("gameOverMessage").style.display = "block";
+}
 
-const clock = new THREE.Clock();
+function checkGameOver() {
+  for (let i = 0; i < enemiesCurrentPosition.length; i++) {
+    if (enemiesCurrentPosition[i].position.z >= 15) {
+      gameOver();
+      break;
+    }
+  }
+}
 
-function animate() {
-  requestAnimationFrame(animate);
+// Eventlisteners
 
-  delta = clock.getDelta();
-  mixers.forEach((mixer) => {
-    mixer.update(delta);
+document.getElementById("startButton").addEventListener("click", () => {
+  startGame();
+});
+
+window.addEventListener("mousemove", function (e) {
+  //calculate so we can have a moving target that the spotlight follows
+  //Calculating where the mouse coordinates are
+  //send a raycast from the camera to the mouseposition on the invisible plane
+  mousePosition.x = (e.clientX / sizes.width) * 2 - 1;
+  mousePosition.y = -(e.clientY / sizes.height) * 2 + 1;
+  planeNormal.copy(camera.position).normalize();
+  plane.setFromNormalAndCoplanarPoint(planeNormal, scene.position); //Set a vertical plane
+  raycaster.setFromCamera(mousePosition, camera); //Raycast from the camera position to the mouse position
+  //where the raycaster hits the plane set targets position
+  if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
+    target.position.copy(intersectionPoint);
+  }
+
+  // is the light shining on any enemy? (is the raycaster point hitting any part of any enemy?)
+
+  pineTreeHit = false;
+  // for each indexed enemyClone
+  enemiesCurrentPosition.forEach((enemyClone, index) => {
+    //if the raycaster intersect with object is more than 0 (it hits an enemyClone)
+    if (raycaster.intersectObject(enemyClone).length > 0) {
+      //for each pineTreeClone
+      pineTreesArray.forEach((pineTreeClone) => {
+        //if the raycaster intersect with object is more than 0 (it hits an pineTreeClone)
+        if (raycaster.intersectObject(pineTreeClone).length > 0) {
+          pineTreeHit = true; //set pineTreeHit to true
+        }
+      });
+      // if raycaster hits enemyClone but not a pineTree and the enemy isn't flagged dead
+      if (!pineTreeHit && !enemyDeadFlags[index]) {
+        enemyDeathAndReset(enemyClone, index);
+      }
+    }
   });
+});
 
-  //step = rotatespeed * delta;
+window.addEventListener("resize", () => {
+  // Update sizes
+  sizes.width = window.innerWidth;
+  sizes.height = window.innerHeight;
 
-  // update tween
-  TWEEN.update();
+  // Update camera
+  camera.aspect = sizes.width / sizes.height;
+  camera.updateProjectionMatrix();
 
-  // Update Orbital Controls
-  controls.update();
-
-  //update shadows
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-  // Update spotlight target
-  light.target.updateMatrixWorld(); // Ensure the spotlight target is updated
-
-  // Render
-  renderer.render(scene, camera);
-}
-
-animate();
-
-document.getElementById(
-  "score"
-).innerHTML = `<h1>Zombies killed: ${score}</h1>`;
-
-/* 
-console.log(target2.quaternion);
-let step = rotatespeed * delta;
-rotationMatrix.lookAt(
-  target2.position,
-  enemyClone.position,
-  enemyClone.up
-);
-targetQuaternion.setFromRotationMatrix(rotationMatrix);
-if (!enemyClone.quaternion.equals(targetQuaternion)) {
-  console.log("it isn't facing the camera");
-  enemyClone.quaternion.rotateTowards(targetQuaternion, step); 
-}
-
-//rotateEnemyTowardsCamera(enemyClone, targetQuaternion, index);
-console.log("rotating towards camera");
-
-/* //to rotate a bit more slowly
-const rotationMatrix = new THREE.Matrix4();
-const targetQuaternion = new THREE.Quaternion();
-const rotatespeed = 2; */
-
-// in animate()
-// if mesh(object) rotation
-/* if (!mesh.quaternion.equals(targetQuaternion)) {
-  const step = rotatespeed * delta;
-  mesh.quaternion.rotateTowards(targetQuaternion, step);
-} */
-
-// compute target rotation
+  // Update renderer
+  renderer.setSize(sizes.width, sizes.height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+});
