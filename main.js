@@ -33,6 +33,7 @@ import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js";
 let delta;
 let score = 0;
 let pineTreeHit;
+let enemyHit;
 let walkActions = [];
 let attackActions = [];
 let deathActions = [];
@@ -50,6 +51,8 @@ let deathAction;
 let listener;
 let music;
 let deathSound;
+let orbitControlsSwitch = document.getElementById("orbitcontrolstoggle");
+//let orbitControlsSwitch.checked; // it returns Boolean value
 
 // canvas
 const canvas = document.querySelector("canvas.webgl");
@@ -76,6 +79,7 @@ scene.add(camera);
 
 // Controls
 const controls = new OrbitControls(camera, canvas);
+controls.enabled = false;
 
 //GroundPlane
 // Plane
@@ -203,12 +207,12 @@ const zombieloader = new GLTFLoader();
 const gltfLoader = new GLTFLoader();
 //let church;
 
-const [churchGlb, zombieGlb, analogclockGlb, pineTreeGlb] = await Promise.all([
+/* const [churchGlb, zombieGlb, analogclockGlb, pineTreeGlb] = await Promise.all([
   gltfLoader.loadAsync("/Church.glb"),
   gltfLoader.loadAsync("/Zombie.glb"),
   gltfLoader.loadAsync("/Analogclock.glb"),
   gltfLoader.loadAsync("/Pinetree.glb"),
-]);
+]); */
 
 function startGame() {
   gameRunning = true;
@@ -220,74 +224,92 @@ function startGame() {
   camera.add(listener);
 
   //  Churchmodel settings
-  const church = churchGlb.scene;
-  church.scale.set(0.1, 0.1, 0.1);
-  church.position.set(0, 0, -15);
-  traverseAndAddShadow(church);
+  const churchLoader = new GLTFLoader();
+  let church;
 
-  scene.add(church);
+  churchLoader.load("/Church.glb", function (gltf) {
+    church = gltf.scene;
+    church.scale.set(0.1, 0.1, 0.1);
+    church.position.set(0, 0, -15);
+    traverseAndAddShadow(church);
+    scene.add(church);
+  });
 
   // Clockmodel settings
-  const analogclock = analogclockGlb.scene;
-  analogclock.scale.set(0.05, 0.05, 0.05);
-  analogclock.rotateY(-Math.PI / 2);
-  analogclock.position.set(0, 5, -10.9);
-  traverseAndAddShadow(analogclock);
-  scene.add(analogclock);
+  const analogclockLoader = new GLTFLoader();
+  let analogclock;
+
+  analogclockLoader.load("/Analogclock.glb", function (gltf) {
+    analogclock = gltf.scene;
+    analogclock.scale.set(0.05, 0.05, 0.05);
+    analogclock.rotateY(-Math.PI / 2);
+    analogclock.position.set(0, 5, -10.9);
+    traverseAndAddShadow(analogclock);
+    scene.add(analogclock);
+  });
 
   // Pinetreemodel settings
-  pineTree = pineTreeGlb.scene;
-  pineTree.scale.set(2, 2, 2); // set scale/size of model
+  const pineTreeLoader = new GLTFLoader();
 
-  //for every cooardinates(items) in the array render a clone of the loaded model
-  //and place it according to the cooardinates in that position in the array
-  for (let i = 0; i < pineTreesPosArray.length; i++) {
-    let pineTreeClone = SkeletonUtils.clone(pineTree);
-    pineTreeClone.position.copy(pineTreesPosArray[i]);
-    traverseAndAddShadow(pineTreeClone);
-    scene.add(pineTreeClone);
-    pineTreesArray.push(pineTreeClone);
-  }
+  pineTreeLoader.load("/Pinetree.glb", function (gltf) {
+    pineTree = gltf.scene;
+    pineTree.scale.set(2, 2, 2); // set scale/size of model
 
-  enemy = zombieGlb.scene;
-  clips = zombieGlb.animations;
-  enemy.scale.set(0.5, 0.5, 0.5);
-  traverseAndAddShadow(enemy);
-
-  //to be able to attach a zombiemoan to each loaded enemyClone I had to wrap
-  //the whole for loop so that for each clone made the sound is added
-  const zombieSoundLoader = new THREE.AudioLoader();
-  zombieSoundLoader.load("/zombie-moans-29924-edited.mp3", function (buffer) {
     //for every cooardinates(items) in the array render a clone of the loaded model
     //and place it according to the cooardinates in that position in the array
-    for (let i = 0; i < enemyPosArray.length; i++) {
-      let enemyClone = SkeletonUtils.clone(enemy);
-      enemyClone.position.copy(enemyPosArray[i]);
-      enemyClone.updateMatrixWorld();
-
-      const audio = new THREE.Audio(listener);
-      audio.setBuffer(buffer);
-      audio.setLoop(true);
-      audio.setVolume(0.1);
-      enemyClone.add(audio);
-
-      // if the enemyClone position is positive rotate it counterclockwise and oposite
-      if (enemyClone.position.x > 0) {
-        enemyClone.rotation.y = -Math.PI / 2;
-      } else {
-        enemyClone.rotation.y = Math.PI / 2;
-      }
-
-      heads[i] = enemyClone.getObjectByName("Head");
-      scene.add(enemyClone);
-      enemiesCurrentPosition[i] = enemyClone;
-      // also where to get const audio = enemiesCurrentPosition[i]
-      // audio.play()
-      enemyDeadFlags[i] = false;
-      const startX = enemyClone.position.x;
-      const endX = enemyClone.position.x > 0 ? 1 : -1;
-      animateEnemy(enemyClone, startX, endX, randomDelayTime(), i);
+    for (let i = 0; i < pineTreesPosArray.length; i++) {
+      let pineTreeClone = SkeletonUtils.clone(pineTree);
+      pineTreeClone.position.copy(pineTreesPosArray[i]);
+      traverseAndAddShadow(pineTreeClone);
+      scene.add(pineTreeClone);
+      pineTreesArray[i] = pineTreeClone;
     }
+  });
+
+  // load zombie model
+  const zombieLoader = new GLTFLoader();
+
+  zombieLoader.load("/Zombie.glb", function (gltf) {
+    clips = gltf.animations;
+    enemy = gltf.scene;
+    enemy.scale.set(0.5, 0.5, 0.5);
+    traverseAndAddShadow(enemy);
+
+    //to be able to attach a zombiemoan to each loaded enemyClone I had to wrap
+    //the whole for loop so that for each clone made the sound is added
+    const zombieSoundLoader = new THREE.AudioLoader();
+    zombieSoundLoader.load("/zombie-moans-29924-edited.mp3", function (buffer) {
+      //for every cooardinates(items) in the array render a clone of the loaded model
+      //and place it according to the cooardinates in that position in the array
+      for (let i = 0; i < enemyPosArray.length; i++) {
+        let enemyClone = SkeletonUtils.clone(enemy);
+        enemyClone.position.copy(enemyPosArray[i]);
+        enemyClone.updateMatrixWorld();
+
+        const audio = new THREE.Audio(listener);
+        audio.setBuffer(buffer);
+        audio.setLoop(true);
+        audio.setVolume(0.1);
+        enemyClone.add(audio);
+
+        // if the enemyClone position is positive rotate it counterclockwise and oposite
+        if (enemyClone.position.x > 0) {
+          enemyClone.rotation.y = -Math.PI / 2;
+        } else {
+          enemyClone.rotation.y = Math.PI / 2;
+        }
+
+        heads[i] = enemyClone.getObjectByName("Head");
+        scene.add(enemyClone);
+        enemiesCurrentPosition[i] = enemyClone;
+        // also where to get const audio = enemiesCurrentPosition[i]
+        // audio.play()
+        enemyDeadFlags[i] = false;
+        const startX = enemyClone.position.x;
+        const endX = enemyClone.position.x > 0 ? 1 : -1;
+        animateEnemy(enemyClone, startX, endX, randomDelayTime(), i);
+      }
+    });
   });
 
   render(scene, camera, renderer, light);
@@ -322,7 +344,6 @@ function initializeAudio() {
     music.setLoop(true);
     music.setVolume(0.3);
     music.play();
-    console.log(music);
   });
 }
 
@@ -340,8 +361,10 @@ function render() {
   // update tween
   TWEEN.update();
 
-  // Update Orbital Controls
-  controls.update();
+  if (controls.enabled) {
+    // Update Orbital Controls
+    controls.update();
+  }
 
   // Update spotlight target
   light.target.updateMatrixWorld(); // Ensure the spotlight target is updated
@@ -349,6 +372,10 @@ function render() {
 
   checkGameOver();
 }
+
+/* function setOrbitcontrolsStatus() {
+  controls.enabled = true;
+} */
 
 function randomDelayTime() {
   return Math.random() * 10000;
@@ -363,7 +390,7 @@ function animateEnemy(enemyClone, startX, endX, delayTime, index) {
     .delay(delayTime)
     .onStart(() => {
       enemyDeadFlags[index] = false;
-      console.log("Starting startTween for enemy index:", index);
+      //console.log("Starting startTween for enemy index:", index);
 
       // set mixer and animation clips
       const mixer = new THREE.AnimationMixer(enemyClone);
@@ -385,6 +412,7 @@ function animateEnemy(enemyClone, startX, endX, delayTime, index) {
       const walkAction = mixer.clipAction(walkClip);
       walkAction.setEffectiveTimeScale(0.9);
       walkActions[index] = walkAction;
+
       walkAction.play();
 
       const attackClip = THREE.AnimationClip.findByName(
@@ -439,25 +467,24 @@ function enemyDeathAndReset(enemyClone, index) {
     deathSound.play();
   });
 
-  deathAction = deathActions[index];
-  walkAction = walkActions[index];
-  attackAction = attackActions[index];
-  deathTween = deathTweens[index];
-  startTween = startTweens[index];
-  backTween = backTweens[index];
-
-  walkAction.stop();
-  attackAction.stop();
-  deathAction.reset().play();
+  walkActions[index].stop();
+  attackActions[index].stop();
+  deathActions[index].reset().play();
 
   enemyDeadFlags[index] = true;
 
-  TWEEN.remove(startTween);
-  TWEEN.remove(backTween);
+  TWEEN.remove(startTweens[index]);
+  TWEEN.remove(backTweens[index]);
 
-  deathTween = new TWEEN.Tween(enemiesCurrentPosition[index])
-    .to({ y: -3 }, 3000) // 3 seconds to sink under ground
+  deathTween = new TWEEN.Tween(enemyClone.position)
+    .to({ y: -1 }, 4000) // 3 seconds to sink under ground
+    .delay(2000)
     .easing(TWEEN.Easing.Linear.None)
+    .onStart(() => {
+      const anything = enemiesCurrentPosition[index];
+      const audio = anything.children[1];
+      audio.stop();
+    })
     .onComplete(() => {
       enemyClone.position.copy(enemyPosArray[index]);
       enemyClone.position.y = 0;
@@ -470,7 +497,6 @@ function enemyDeathAndReset(enemyClone, index) {
         index
       );
     });
-  deathTweens[index] = deathTween;
   deathTween.start();
 
   score++;
@@ -500,6 +526,31 @@ document.getElementById("startButton").addEventListener("click", () => {
   startGame();
 });
 
+/* document.getElementById(
+  "orbitcontrols"
+).innerHTML = `<button id="orbitcontrols">Orbitcontrols on</button>`;
+ */
+
+/* 
+document.getElementById("orbitcontrols").addEventListener("click", () => {
+  if (typeof controls !== "undefined") {
+    // Update Orbital Controls
+    controls.update();
+  }
+
+  console.log(OrbitControls);
+}); */
+
+orbitControlsSwitch.addEventListener("click", () => {
+  if (!controls.enabled) {
+    controls.enabled = true;
+    console.log("orbitcontroles enabled");
+  } else {
+    controls.enabled = false;
+    console.log("orbitcontroles disabled");
+  }
+});
+
 window.addEventListener("mousemove", function (e) {
   //calculate so we can have a moving target that the spotlight follows
   //Calculating where the mouse coordinates are
@@ -521,10 +572,13 @@ window.addEventListener("mousemove", function (e) {
   enemiesCurrentPosition.forEach((enemyClone, index) => {
     //if the raycaster intersect with object is more than 0 (it hits an enemyClone)
     if (raycaster.intersectObject(enemyClone).length > 0) {
+      console.log("enemyClone intersect!");
+
       //for each pineTreeClone
       pineTreesArray.forEach((pineTreeClone) => {
         //if the raycaster intersect with object is more than 0 (it hits an pineTreeClone)
         if (raycaster.intersectObject(pineTreeClone).length > 0) {
+          console.log("pineTreeClone intersect!");
           pineTreeHit = true; //set pineTreeHit to true
         }
       });

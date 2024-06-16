@@ -10,9 +10,21 @@
   <body>
     <div class="container">
       <div class="content">
+        <div class="orbitcontrols" id="orbitcontrols">
+          <input
+            type="checkbox"
+            name="orbitcontrolstoggle"
+            id="orbitcontrolstoggle"
+          />
+          <label for="orbitcontrolstoggle"
+            ><span class="on">Move camera On</span>
+            <span class="off">Move camera Off</span></label
+          >
+        </div>
         <div class="score" id="score"></div>
       </div>
     </div>
+
     <div id="backstory" class="backstory">
       <p>
         Your so called "friends" have dared you to a challenge. Go to the old
@@ -29,6 +41,7 @@
       Game over! Reload page
     </div>
     <canvas class="webgl"></canvas>
-    <script type="module" src="/main.js"></script>
+    <!-- <script type="module" src="/main.js"></script> -->
+    <script type="module" src="test_env.js"></script>
   </body>
 </html>

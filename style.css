@@ -19,11 +19,16 @@ canvas.webgl {
 }
 
 .container {
-  position: absolute;
+  display: flex;
   z-index: 1;
   width: 100%;
   height: 100vh;
   pointer-events: none;
+}
+
+.content {
+  z-index: 1;
+  justify-content: space-between;
 }
 
 .backstory {
@@ -37,6 +42,15 @@ canvas.webgl {
   cursor: pointer;
   z-index: 1;
   display: none;
+}
+
+@media (max-width: 1024px) {
+  .backstory {
+    font-size: 10px;
+  }
+  .gameOverMessage {
+    font-size: 3rem;
+  }
 }
 
 .startButton {
@@ -61,4 +75,100 @@ canvas.webgl {
   cursor: pointer;
   display: none;
   z-index: 1;
+}
+
+.orbitcontrols {
+  position: absolute;
+}
+
+label {
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  position: relative;
+}
+
+label span {
+  position: absolute;
+}
+
+/*
+   remove the default styling of the checkbox using appearance
+   and create the outer toggle area
+*/
+
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: 2px solid black;
+  background: #eee;
+  transition: all 0.4s;
+  z-index: 1;
+}
+
+/*
+   style the ::before content to look like
+   the inner toggle switch - the bit that moves
+*/
+
+input[type="checkbox"]::before {
+  width: 16px;
+  height: 16px;
+  border-radius: 9px;
+  background-color: black;
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 16%;
+  transition: all 0.4s;
+}
+
+/*
+   change the outer background color and move the inner toggle switch
+   when the checkbox is checked; use transitions for smooth animation
+*/
+
+input[type="checkbox"]:checked {
+  background-color: #ffaa00;
+  transition: all 0.4s;
+}
+
+input[type="checkbox"]:checked::before {
+  left: 35%;
+  transition: all 0.4s;
+}
+
+/*
+   cause the On and Off parts of the label to be visible when the checkbox is
+   checked and unchecked, respectively
+*/
+
+input[type="checkbox"] ~ label .off,
+input[type="checkbox"]:checked ~ label .on {
+  opacity: 0;
+}
+
+input[type="checkbox"] ~ label .on,
+input[type="checkbox"]:checked ~ label .off {
+  opacity: 1;
+}
+
+/*
+   make the focus outline a bit more subtle on Chrome, rather than the
+   default heavy blue outline
+*/
+
+input:focus {
+  outline: 1px dotted black;
+}
+
+.on {
+  color: white;
+}
+
+.off {
+  color: white;
 }
